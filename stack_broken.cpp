@@ -19,19 +19,21 @@ private:
 public:
     void push(T value) {
         Node* new_node = new Node(std::move(value));
-        Node* expected = top_.load();
+        Node* expected = top_.load(memory_order_relaxed);
         while (true) {
             new_node->next = expected;
-            if (top_.compare_exchange_weak(expected, new_node)) break;
+            if (top_.compare_exchange_weak(expected, new_node,
+                memory_order_relaxed, memory_order_relaxed)) break;
         }
     }
 
     optional<T> pop() {
-        Node* expected = top_.load();
+        Node* expected = top_.load(memory_order_relaxed);
         while (true) {
             if (expected == nullptr) return nullopt;
             Node* desired = expected->next;
-            if (top_.compare_exchange_weak(expected, desired)) {
+            if (top_.compare_exchange_weak(expected, desired,
+                memory_order_relaxed, memory_order_relaxed)) {
                 T val = std::move(expected->data);
                 delete expected;
                 return val;
@@ -40,7 +42,7 @@ public:
     }
 
     ~LockFreeStack() {
-        Node* current = top_.load();
+        Node* current = top_.load(memory_order_relaxed);
         while (current) {
             Node* next = current->next;
             delete current;
